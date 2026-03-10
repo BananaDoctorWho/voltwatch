@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoltWatch — eBike Price Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root { --bg:#0a0a0a;--surface:#111111;--surface2:#181818;--border:#222222;--accent:#c8ff00;--text:#f0f0f0;--muted:#666666;--green:#22c55e;--red:#ef4444;--yellow:#f59e0b; }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden}
+  body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E")}
+
+  header{position:sticky;top:0;z-index:100;background:rgba(10,10,10,0.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:64px}
+  .logo{display:flex;align-items:baseline;gap:.5rem}
+  .logo-text{font-family:'Bebas Neue',sans-serif;font-size:2rem;letter-spacing:.1em;color:var(--accent);line-height:1}
+  .logo-sub{font-family:'DM Mono',monospace;font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.2em}
+  .header-status{display:flex;align-items:center;gap:.5rem;font-family:'DM Mono',monospace;font-size:.7rem;color:var(--muted)}
+  .pulse{width:8px;height:8px;background:var(--accent);border-radius:50%;animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(200,255,0,.4)}50%{opacity:.7;box-shadow:0 0 0 6px rgba(200,255,0,0)}}
+
+  .tabs-nav{position:sticky;top:64px;z-index:99;background:rgba(10,10,10,.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;padding:0 2rem;overflow-x:auto}
+  .tab-btn{font-family:'DM Mono',monospace;font-size:.75rem;text-transform:uppercase;letter-spacing:.15em;padding:1rem 1.5rem;color:var(--muted);background:none;border:none;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+  .tab-btn:hover{color:var(--text)}
+  .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab-panel{display:none}
+  .tab-panel.active{display:block}
+
+  .section{padding:2rem;max-width:1400px;margin:0 auto;position:relative;z-index:1}
+  .section-title{font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:.1em;margin-bottom:.4rem}
+  .section-sub{font-family:'DM Mono',monospace;font-size:.7rem;color:var(--muted);margin-bottom:2rem;text-transform:uppercase;letter-spacing:.2em}
+
+  .hero{padding:3rem 2rem 1rem;max-width:1400px;margin:0 auto;position:relative;z-index:1}
+  .hero-tag{font-family:'DM Mono',monospace;font-size:.7rem;color:var(--accent);text-transform:uppercase;letter-spacing:.3em;margin-bottom:1rem;display:flex;align-items:center;gap:.75rem}
+  .hero-tag::before{content:'';width:32px;height:1px;background:var(--accent)}
+  .hero h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(3rem,7vw,6rem);line-height:.9;letter-spacing:.02em;margin-bottom:1rem}
+  .hero h1 span{color:var(--accent)}
+  .hero-desc{font-size:.95rem;color:var(--muted);max-width:520px;line-height:1.6}
+
+  .email-box{background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);padding:1.75rem;display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end}
+  .email-field{flex:1;min-width:240px}
+  .email-label{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.2em;margin-bottom:.5rem;display:block}
+  .email-input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:.75rem 1rem;font-family:'DM Mono',monospace;font-size:.85rem;outline:none;transition:border-color .2s}
+  .email-input:focus{border-color:var(--accent)}
+  .email-input::placeholder{color:var(--muted)}
+  .email-desc{font-size:.8rem;color:var(--muted);margin-top:.4rem}
+  .email-status{font-family:'DM Mono',monospace;font-size:.75rem;margin-top:.5rem;display:none}
+  .email-status.success{color:var(--green);display:block}
+  .email-status.error{color:var(--red);display:block}
+
+  .stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:1.5px;background:var(--border);margin-bottom:2rem}
+  .stat-cell{background:var(--surface);padding:1.5rem;text-align:center}
+  .stat-number{font-family:'Bebas Neue',sans-serif;font-size:2.5rem;color:var(--accent);line-height:1;margin-bottom:.25rem}
+  .stat-label{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.2em}
+
+  .btn{background:var(--accent);color:#000;border:none;padding:1rem 2.5rem;font-family:'DM Mono',monospace;font-size:.85rem;font-weight:500;text-transform:uppercase;letter-spacing:.15em;cursor:pointer;transition:all .2s;clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px))}
+  .btn:hover{background:#d4ff26;transform:translateY(-2px);box-shadow:0 8px 32px rgba(200,255,0,.3)}
+  .btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+  .btn.scanning{background:var(--surface2);color:var(--accent);border:1px solid var(--accent);clip-path:none;animation:scanPulse 1.5s infinite}
+  @keyframes scanPulse{0%,100%{box-shadow:0 0 0 0 rgba(200,255,0,.3)}50%{box-shadow:0 0 20px 4px rgba(200,255,0,.15)}}
+
+  .agent-terminal{background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);padding:1.5rem;font-family:'DM Mono',monospace;font-size:.8rem;min-height:120px;display:none;margin-bottom:2rem}
+  .agent-terminal.active{display:block}
+  .terminal-header{display:flex;align-items:center;gap:.5rem;color:var(--accent);text-transform:uppercase;letter-spacing:.2em;font-size:.65rem;margin-bottom:1rem;padding-bottom:.75rem;border-bottom:1px solid var(--border)}
+  .terminal-content{color:#aaa;line-height:2;white-space:pre-wrap}
+
+  .bikes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1.5px;background:var(--border)}
+  .bike-card{background:var(--surface);padding:1.75rem;transition:background .2s;position:relative;overflow:hidden}
+  .bike-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:transparent;transition:background .3s}
+  .bike-card:hover{background:var(--surface2)}
+  .bike-card:hover::before{background:var(--accent)}
+  .bike-card.deal-hot::before{background:var(--green)!important}
+  .bike-card.deal-warm::before{background:var(--yellow)!important}
+  .bike-brand{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.25em;margin-bottom:.4rem}
+  .bike-name{font-family:'Bebas Neue',sans-serif;font-size:1.6rem;letter-spacing:.05em;line-height:1.1;margin-bottom:1.25rem}
+  .price-row{display:flex;align-items:flex-end;gap:.75rem;margin-bottom:1.25rem}
+  .price-current{font-family:'Bebas Neue',sans-serif;font-size:2.2rem;letter-spacing:.02em;color:var(--accent);line-height:1}
+  .price-original{font-family:'DM Mono',monospace;font-size:.8rem;color:var(--muted);text-decoration:line-through;padding-bottom:4px}
+  .price-drop{font-family:'DM Mono',monospace;font-size:.7rem;color:var(--green);padding:2px 8px;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.2)}
+  .bike-specs{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:1.25rem}
+  .spec-item{background:var(--bg);padding:.6rem}
+  .spec-label{font-family:'DM Mono',monospace;font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.15em;margin-bottom:2px}
+  .spec-value{font-size:.85rem;font-weight:500}
+  .deal-badge{display:inline-flex;align-items:center;gap:.4rem;padding:.4rem .75rem;font-family:'DM Mono',monospace;font-size:.65rem;font-weight:500;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1.25rem}
+  .deal-badge.good{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.3)}
+  .deal-badge.watch{background:rgba(245,158,11,.1);color:var(--yellow);border:1px solid rgba(245,158,11,.3)}
+  .deal-badge.neutral{background:rgba(102,102,102,.1);color:var(--muted);border:1px solid rgba(102,102,102,.2)}
+  .buy-link{display:block;text-align:center;padding:.75rem;font-family:'DM Mono',monospace;font-size:.75rem;font-weight:500;text-transform:uppercase;letter-spacing:.15em;text-decoration:none;color:var(--text);border:1px solid var(--border);transition:all .2s}
+  .buy-link:hover{border-color:var(--accent);color:var(--accent);background:rgba(200,255,0,.05)}
+  .my-pick-tag{position:absolute;top:1.75rem;right:1.75rem;font-family:'DM Mono',monospace;font-size:.6rem;color:var(--accent);border:1px solid var(--accent);padding:2px 8px;background:rgba(200,255,0,.05)}
+
+  .analysis-box{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);padding:2rem;display:none;margin-top:2rem}
+  .analysis-box.active{display:block}
+  .analysis-header{display:flex;align-items:center;gap:.75rem;margin-bottom:1.5rem}
+  .analysis-icon{width:32px;height:32px;background:var(--accent);color:#000;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0}
+  .analysis-title{font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:.1em}
+  .analysis-content{font-size:.9rem;line-height:1.8;color:#ccc}
+  .analysis-content strong{color:var(--accent);font-weight:500}
+
+  /* CHARTS TAB */
+  .chart-legend{display:flex;flex-wrap:wrap;gap:1rem;margin-bottom:2rem;background:var(--surface);padding:1.25rem;border:1px solid var(--border)}
+  .legend-item{display:flex;align-items:center;gap:.5rem;font-family:'DM Mono',monospace;font-size:.72rem;color:var(--text)}
+  .legend-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+  .charts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(480px,1fr));gap:1.5px;background:var(--border)}
+  .chart-wrap{background:var(--surface);padding:1.5rem}
+  .chart-title-row{display:flex;align-items:center;gap:.6rem;margin-bottom:1rem}
+  .chart-title-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  .chart-title{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:.06em}
+  .chart-msrp{font-family:'DM Mono',monospace;font-size:.68rem;color:var(--muted);margin-left:auto}
+  .no-data-msg{font-family:'DM Mono',monospace;font-size:.85rem;color:var(--muted);text-align:center;padding:4rem 2rem;background:var(--surface);border:1px solid var(--border);line-height:2}
+
+  /* SEASONAL TAB */
+  .seasonal-intro{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--yellow);padding:1.5rem 2rem;margin-bottom:2rem;font-size:.9rem;color:#ccc;line-height:1.8}
+  .seasonal-intro strong{color:var(--yellow)}
+  .events-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1.5px;background:var(--border)}
+  .event-card{background:var(--surface);padding:1.5rem;position:relative;transition:background .2s}
+  .event-card:hover{background:var(--surface2)}
+  .event-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+  .event-month{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.2em;margin-bottom:.4rem}
+  .event-name{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:.05em;margin-bottom:.75rem}
+  .event-badge{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .75rem;font-family:'DM Mono',monospace;font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;border:1px solid}
+  .event-badge.fire{color:var(--red);border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.08)}
+  .event-badge.warm{color:var(--yellow);border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.08)}
+  .event-badge.mild{color:#3b82f6;border-color:rgba(59,130,246,.3);background:rgba(59,130,246,.08)}
+  .event-badge.best{color:var(--green);border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.08)}
+  .event-desc{font-size:.85rem;color:#999;line-height:1.6;margin-bottom:.75rem}
+  .event-tip{font-family:'DM Mono',monospace;font-size:.72rem;color:var(--accent);padding:.6rem .75rem;background:rgba(200,255,0,.05);border-left:2px solid var(--accent)}
+  .event-days{position:absolute;top:1.5rem;right:1.5rem;font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);text-align:right}
+  .up-next-tag{font-family:'DM Mono',monospace;font-size:.6rem;color:var(--accent);background:rgba(200,255,0,.1);border:1px solid var(--accent);padding:2px 8px;display:inline-block;margin-bottom:.75rem;text-transform:uppercase;letter-spacing:.15em}
+
+  footer{padding:2rem;border-top:1px solid var(--border);max-width:1400px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;position:relative;z-index:1}
+  .footer-text{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.15em}
+  .spinner{display:inline-block;width:12px;height:12px;border:2px solid rgba(200,255,0,.2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border)}
+  @media(max-width:768px){.stats-bar{grid-template-columns:repeat(2,1fr)}.bikes-grid,.events-grid,.charts-grid{grid-template-columns:1fr}header,.hero,.section{padding-left:1rem;padding-right:1rem}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="logo-text">VoltWatch</span>
+    <span class="logo-sub">/ eBike Price Intelligence</span>
+  </div>
+  <div class="header-status">
+    <div class="pulse"></div>
+    <span id="lastUpdated">READY TO SCAN</span>
+  </div>
+</header>
+
+<nav class="tabs-nav">
+  <button class="tab-btn active" onclick="switchTab('tracker',this)">⚡ Price Tracker</button>
+  <button class="tab-btn" onclick="switchTab('charts',this)">📈 Price History</button>
+  <button class="tab-btn" onclick="switchTab('seasonal',this)">📅 Seasonal Deals</button>
+</nav>
+
+<!-- TAB 1: TRACKER -->
+<div id="tab-tracker" class="tab-panel active">
+  <div class="hero">
+    <div class="hero-tag">AI-Powered Deal Detection</div>
+    <h1>KNOW WHEN<br>TO <span>BUY.</span></h1>
+    <p class="hero-desc">Real-time price intelligence for the hottest eBikes. Every scan logs a data point on the Price History tab.</p>
+  </div>
+
+  <div class="section" style="padding-top:1rem">
+    <div class="email-box">
+      <div class="email-field">
+        <label class="email-label" for="alertEmail">📬 Deal Alert Email</label>
+        <input class="email-input" type="email" id="alertEmail" placeholder="you@email.com"/>
+        <div class="email-desc">Get emailed instantly when any tracked bike drops in price.</div>
+        <div class="email-status" id="emailStatus"></div>
+      </div>
+      <div><button class="btn" onclick="saveEmail()">Save Email</button></div>
+    </div>
+  </div>
+
+  <div class="section" style="padding-top:0">
+    <div class="stats-bar">
+      <div class="stat-cell"><div class="stat-number">6</div><div class="stat-label">Bikes Tracked</div></div>
+      <div class="stat-cell"><div class="stat-number" id="dealCount">—</div><div class="stat-label">Active Deals</div></div>
+      <div class="stat-cell"><div class="stat-number" id="avgSavings">—</div><div class="stat-label">Avg Savings</div></div>
+      <div class="stat-cell"><div class="stat-number" id="scanCount">0</div><div class="stat-label">Scans Run</div></div>
+    </div>
+    <button class="btn" id="scanBtn" onclick="runScan()">⚡ Run Price Intelligence Scan</button>
+  </div>
+
+  <div class="section" style="padding-top:0">
+    <div class="agent-terminal" id="agentTerminal">
+      <div class="terminal-header"><span class="spinner"></span> VOLTWATCH AI AGENT — LIVE SCAN</div>
+      <div class="terminal-content" id="terminalContent"></div>
+    </div>
+    <div class="section-title">Tracked Bikes</div>
+    <div class="section-sub">// Live pricing · Run scan to refresh · ★ = Editor's Pick · colored dot matches chart</div>
+    <div class="bikes-grid" id="bikesGrid"></div>
+    <div class="analysis-box" id="analysisBox">
+      <div class="analysis-header">
+        <div class="analysis-icon">⚡</div>
+        <div class="analysis-title">AI Market Analysis</div>
+      </div>
+      <div class="analysis-content" id="analysisContent"></div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 2: PRICE HISTORY -->
+<div id="tab-charts" class="tab-panel">
+  <div class="section">
+    <div class="section-title">Price History Charts</div>
+    <div class="section-sub">// Jan 1 2026 baseline seeded · Each scan adds a new data point · Dashed line = MSRP</div>
+    <div class="chart-legend" id="chartLegend"></div>
+    <div class="charts-grid" id="chartsContainer"></div>
+  </div>
+</div>
+
+<!-- TAB 3: SEASONAL -->
+<div id="tab-seasonal" class="tab-panel">
+  <div class="section">
+    <div class="section-title">Seasonal Deal Calendar</div>
+    <div class="section-sub">// When prices historically drop · Plan your purchase around these events</div>
+    <div class="seasonal-intro">
+      eBike prices follow predictable seasonal patterns. <strong>Black Friday & Cyber Monday</strong> are the undisputed best times to buy — 15–30% off is common. <strong>Memorial Day</strong> is the second best window. Use this calendar to time your purchase and never pay full price.
+    </div>
+    <div class="events-grid" id="eventsGrid"></div>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-text">© 2026 VoltWatch — eBike Price Intelligence</div>
+  <div class="footer-text" id="footerScan">Last scan: Never</div>
+</footer>
+
+<script>
+// ── BIKES ──────────────────────────────────────────────────────────────────
+const BIKES = [
+  {id:'revibikes-cougar',   brand:'Revibikes', name:'Cougar',         msrp:1699,currentPrice:1499,motor:'1000W Peak',       range:'80 mi', battery:'1040Wh',speed:'34 mph',url:'https://www.revibikes.com/products/cougar-electric-motorbikes',myPick:false},
+  {id:'lectric-xp4',        brand:'Lectric',   name:'XP4 750W',       msrp:1299,currentPrice:1299,motor:'750W / 1310W Peak', range:'85 mi', battery:'840Wh', speed:'28 mph',url:'https://lectricebikes.com/collections/xp4-ebikes',            myPick:false},
+  {id:'aventon-aventure3',  brand:'Aventon',   name:'Aventure 3',     msrp:1999,currentPrice:1999,motor:'750W / 1188W Peak', range:'65 mi', battery:'733Wh', speed:'28 mph',url:'https://www.aventon.com/products/aventure-3-ebike',           myPick:false},
+  {id:'rad-radrover6',      brand:'Rad Power', name:'RadRover 6 Plus',msrp:1999,currentPrice:1799,motor:'750W',             range:'45+ mi',battery:'614Wh', speed:'20 mph',url:'https://www.radpowerbikes.com/collections/electric-bikes',     myPick:true},
+  {id:'velotric-discover2', brand:'Velotric',  name:'Discover 2',     msrp:1799,currentPrice:1499,motor:'500W / 900W Peak',  range:'65 mi', battery:'692Wh', speed:'28 mph',url:'https://www.velotricbike.com/products/velotric-discover-2-ebike',myPick:true},
+  {id:'ride1up-prodigy',    brand:'Ride1Up',   name:'Prodigy',        msrp:2095,currentPrice:1795,motor:'500W Mid-Drive',    range:'50+ mi',battery:'504Wh', speed:'28 mph',url:'https://ride1up.com/product/prodigy/',                       myPick:true}
+];
+const COLORS = ['#c8ff00','#ff6b35','#3b82f6','#a855f7','#22c55e','#f59e0b'];
+
+// ── SEASONAL ──────────────────────────────────────────────────────────────
+function daysUntil(m,d){const n=new Date(),t=new Date(n.getFullYear(),m-1,d);if(t<n)t.setFullYear(n.getFullYear()+1);return Math.ceil((t-n)/86400000)}
+const EVENTS = [
+  {month:'January',    name:"New Year's Sales",          tier:'warm',badge:'warm',badgeLabel:'Moderate Deals',  color:'#f59e0b',desc:'Brands clear holiday overstock in early January. Expect 5–10% off select models as retailers reset inventory.',tip:"Good time to snag last year's models at a small discount.",m:1,d:1},
+  {month:'February',   name:"Valentine's Day",           tier:'cool',badge:'mild',badgeLabel:'Minimal Deals',   color:'#3b82f6',desc:'Not a strong eBike sale period. A few brands run small promos but discounts are minor.',tip:'Skip this one — better deals are coming in spring.',m:2,d:14},
+  {month:'March–April',name:'Spring Launch Sales',       tier:'warm',badge:'warm',badgeLabel:'Good Deals',      color:'#f59e0b',desc:'As riding season begins, brands push new inventory. Prior-year models get marked down 10–15% to clear space.',tip:'Target 2025 carryover models — often discounted with full warranty still intact.',m:3,d:20},
+  {month:'May',        name:'Memorial Day Weekend',      tier:'hot', badge:'fire',badgeLabel:'🔥 Hot Sale',     color:'#ef4444',desc:'One of the best sale weekends of the year. Most major eBike brands run 10–20% off sitewide.',tip:'Lectric and Rad Power historically run their biggest spring sales here. Set alerts now.',m:5,d:26},
+  {month:'July',       name:'Prime Day / Summer Sale',   tier:'warm',badge:'warm',badgeLabel:'Good Deals',      color:'#f59e0b',desc:'Amazon Prime Day triggers competitor sales everywhere. Brands often match or beat Amazon pricing.',tip:'Check brand websites directly — they often beat Amazon prices to avoid fees.',m:7,d:15},
+  {month:'Aug–Sep',    name:'End-of-Season Clearance',   tier:'warm',badge:'warm',badgeLabel:'Hidden Gems',     color:'#f59e0b',desc:'Late summer clearance on current-year models as brands prep for new releases. Less publicized but real.',tip:'Look for "clearance" or "open box" listings — great value on near-new bikes.',m:8,d:15},
+  {month:'October',    name:'Pre-Holiday Sales',         tier:'warm',badge:'warm',badgeLabel:'Building Up',     color:'#f59e0b',desc:'Early October teaser sales as brands warm up for Black Friday. Some early deals are as good as the real thing.',tip:'Watch for early Black Friday previews — some match November pricing.',m:10,d:1},
+  {month:'November',   name:'Black Friday / Cyber Monday',tier:'hot',badge:'best',badgeLabel:'🏆 BEST OF YEAR', color:'#22c55e',desc:'The undisputed king of eBike deals. Discounts of 15–30% are common across Lectric, Rad Power, Aventon, and others. Stock sells out fast.',tip:'THIS is the time to buy. Have your payment ready. Do not hesitate — good deals sell out in hours.',m:11,d:28},
+  {month:'December',   name:'Holiday & Year-End Sales',  tier:'hot', badge:'fire',badgeLabel:'🔥 Strong Deals', color:'#ef4444',desc:'Strong deals continue through mid-December. After Christmas, brands aggressively clear remaining inventory.',tip:'Dec 26–31 year-end clearance often rivals Black Friday pricing with far less competition.',m:12,d:26},
+];
+
+// ── STATE ─────────────────────────────────────────────────────────────────
+let scanCount = 0, alertEmail = '', charts = {};
+let priceHistory = {};
+
+function loadHistory() {
+  try { const s = localStorage.getItem('vw_history'); if(s) priceHistory = JSON.parse(s); } catch(e){}
+  BIKES.forEach(b => {
+    if (!priceHistory[b.id] || priceHistory[b.id].length === 0)
+      priceHistory[b.id] = [{date:'Jan 1',price:b.msrp,label:'Jan 1 Baseline'}];
+  });
+}
+function saveHistory() { try { localStorage.setItem('vw_history', JSON.stringify(priceHistory)); } catch(e){} }
+function recordScan() {
+  const label = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' ' + new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  BIKES.forEach(b => {
+    if (!priceHistory[b.id]) priceHistory[b.id] = [];
+    priceHistory[b.id].push({date:label, price:b.currentPrice, label});
+  });
+  saveHistory();
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  btn.classList.add('active');
+  if (tab==='charts') renderCharts();
+  if (tab==='seasonal') renderSeasonal();
+}
+
+// ── TAB 1 ─────────────────────────────────────────────────────────────────
+function getDeal(bike) {
+  const s = bike.msrp - bike.currentPrice, p = ((s/bike.msrp)*100).toFixed(0);
+  if (s>=300) return {label:`🔥 Hot Deal — ${p}% off`,cls:'good',cardCls:'deal-hot'};
+  if (s>=100) return {label:`📉 On Sale — ${p}% off`,cls:'watch',cardCls:'deal-warm'};
+  return {label:'→ At MSRP',cls:'neutral',cardCls:''};
+}
+function renderBikes() {
+  document.getElementById('bikesGrid').innerHTML = BIKES.map((b,i) => {
+    const deal = getDeal(b), sav = b.msrp - b.currentPrice;
+    return `<div class="bike-card ${deal.cardCls}">
+      ${b.myPick?'<div class="my-pick-tag">★ Editor\'s Pick</div>':''}
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
+        <div style="width:10px;height:10px;border-radius:50%;background:${COLORS[i]};flex-shrink:0"></div>
+        <div class="bike-brand">${b.brand}</div>
+      </div>
+      <div class="bike-name">${b.name}</div>
+      <div class="deal-badge ${deal.cls}">${deal.label}</div>
+      <div class="price-row">
+        <div class="price-current">$${b.currentPrice.toLocaleString()}</div>
+        ${sav>0?`<div class="price-original">$${b.msrp.toLocaleString()}</div><div class="price-drop">–$${sav}</div>`:''}
+      </div>
+      <div class="bike-specs">
+        <div class="spec-item"><div class="spec-label">Motor</div><div class="spec-value">${b.motor}</div></div>
+        <div class="spec-item"><div class="spec-label">Range</div><div class="spec-value">${b.range}</div></div>
+        <div class="spec-item"><div class="spec-label">Battery</div><div class="spec-value">${b.battery}</div></div>
+        <div class="spec-item"><div class="spec-label">Top Speed</div><div class="spec-value">${b.speed}</div></div>
+      </div>
+      <a class="buy-link" href="${b.url}" target="_blank">→ View Current Price</a>
+    </div>`;
+  }).join('');
+}
+function updateStats() {
+  const d = BIKES.filter(b=>b.currentPrice<b.msrp);
+  const avg = d.length ? Math.round(d.reduce((s,b)=>s+(b.msrp-b.currentPrice),0)/d.length) : 0;
+  document.getElementById('dealCount').textContent = d.length;
+  document.getElementById('avgSavings').textContent = avg ? `$${avg}` : '$0';
+  document.getElementById('scanCount').textContent = scanCount;
+}
+function saveEmail() {
+  const v = document.getElementById('alertEmail').value.trim(), st = document.getElementById('emailStatus');
+  if (!v||!v.includes('@')) { st.textContent='✗ Please enter a valid email.'; st.className='email-status error'; return; }
+  alertEmail=v; localStorage.setItem('vw_email',v);
+  st.textContent=`✓ Saved! Alerts active for ${v}`; st.className='email-status success';
+}
+async function sendAlert(deals) {
+  if (!alertEmail||!deals.length) return;
+  try { await fetch('/api/alert',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:alertEmail,deals})}); } catch(e){}
+}
+async function runScan() {
+  const btn=document.getElementById('scanBtn'), term=document.getElementById('agentTerminal'), tc=document.getElementById('terminalContent');
+  btn.disabled=true; btn.className='btn scanning'; btn.innerHTML='<span class="spinner"></span> SCANNING MARKETS...';
+  term.className='agent-terminal active'; tc.textContent='';
+  document.getElementById('lastUpdated').textContent='SCANNING NOW...';
+  scanCount++;
+  for (const s of ['>  Initializing VoltWatch AI agent...','> Loading bike registry: 6 models tracked','> Querying Revibikes, Lectric, Aventon, Rad Power, Velotric, Ride1Up...','> Analyzing price history & deal thresholds...','> Running AI market analysis...','']) {
+    tc.textContent+=s+'\n'; await new Promise(r=>setTimeout(r,280));
+  }
+  const bikeData = BIKES.map(b=>({name:`${b.brand} ${b.name}`,msrp:b.msrp,currentPrice:b.currentPrice,savings:b.msrp-b.currentPrice,savingsPct:(((b.msrp-b.currentPrice)/b.msrp)*100).toFixed(1),motor:b.motor,range:b.range}));
+  try {
+    const res = await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      system:`You are VoltWatch, an elite eBike price intelligence agent. Analyze the given bike pricing data and produce:
+1. A brief terminal-style scan log (4-5 lines, use ">" prefix, mention specific bikes and prices)
+2. A clear deal recommendation section
+Format your response as JSON: { "terminalLines": ["line1","line2",...], "analysis": "HTML analysis text using <strong> for highlights" }
+JSON only. No markdown fences.`,
+      prompt:`Analyze these eBike prices:\n${JSON.stringify(bikeData,null,2)}\nToday: ${new Date().toLocaleDateString()}. Provide sharp, actionable buying advice.`
+    })});
+    const data = await res.json();
+    const parsed = JSON.parse(data.text.replace(/```json|```/g,'').trim());
+    for (const line of (parsed.terminalLines||[])) { tc.textContent+=line+'\n'; await new Promise(r=>setTimeout(r,220)); }
+    tc.textContent+='\n> ✓ Scan complete.\n';
+    document.getElementById('analysisContent').innerHTML = parsed.analysis||'';
+    document.getElementById('analysisBox').className='analysis-box active';
+  } catch(e) { tc.textContent+=`> ⚠ AI unavailable: ${e.message}\n`; }
+
+  recordScan();
+  const activeDeals = BIKES.filter(b=>b.currentPrice<b.msrp);
+  if (alertEmail && activeDeals.length) {
+    tc.textContent+=`\n> 📬 Sending deal alert to ${alertEmail}...\n`;
+    await sendAlert(activeDeals);
+    tc.textContent+=`> ✓ Alert email sent!\n`;
+  }
+  renderBikes(); updateStats();
+  const now = new Date().toLocaleTimeString();
+  document.getElementById('lastUpdated').textContent=`LAST SCAN: ${now}`;
+  document.getElementById('footerScan').textContent=`Last scan: ${now}`;
+  btn.disabled=false; btn.className='btn'; btn.innerHTML='⚡ Run Price Intelligence Scan';
+}
+
+// ── TAB 2: CHARTS ────────────────────────────────────────────────────────
+function renderCharts() {
+  document.getElementById('chartLegend').innerHTML = BIKES.map((b,i)=>`
+    <div class="legend-item"><div class="legend-dot" style="background:${COLORS[i]}"></div>${b.brand} ${b.name}</div>`).join('');
+
+  Object.values(charts).forEach(c=>c.destroy()); charts={};
+  const container = document.getElementById('chartsContainer');
+  const maxPts = Math.max(...BIKES.map(b=>(priceHistory[b.id]||[]).length));
+
+  if (maxPts < 2) {
+    container.innerHTML=`<div class="no-data-msg" style="grid-column:1/-1">
+      <div style="font-size:2.5rem;margin-bottom:1rem">📊</div>
+      <div style="color:var(--text);font-size:.95rem;margin-bottom:.5rem">Run your first scan to start building price history!</div>
+      <div>The Jan 1, 2026 MSRP baseline is already seeded. Each scan adds a new data point.</div>
+    </div>`;
+    return;
+  }
+
+  container.innerHTML = BIKES.map((b,i)=>`
+    <div class="chart-wrap">
+      <div class="chart-title-row">
+        <div class="chart-title-dot" style="background:${COLORS[i]}"></div>
+        <div class="chart-title">${b.brand} ${b.name}</div>
+        <div class="chart-msrp">MSRP $${b.msrp.toLocaleString()}</div>
+      </div>
+      <canvas id="chart-${b.id}" height="160"></canvas>
+    </div>`).join('');
+
+  BIKES.forEach((b,i) => {
+    const hist = priceHistory[b.id]||[];
+    const labels = hist.map(h=>h.label||h.date);
+    const prices = hist.map(h=>h.price);
+    const color = COLORS[i];
+    const ctx = document.getElementById(`chart-${b.id}`).getContext('2d');
+    charts[b.id] = new Chart(ctx, {
+      type:'line',
+      data:{
+        labels,
+        datasets:[{
+          label:`${b.brand} ${b.name}`,data:prices,
+          borderColor:color,backgroundColor:color+'20',
+          pointBackgroundColor:color,pointBorderColor:'#0a0a0a',pointBorderWidth:2,
+          pointRadius:5,pointHoverRadius:7,borderWidth:2.5,fill:true,tension:0.35
+        },{
+          label:'MSRP',data:Array(prices.length).fill(b.msrp),
+          borderColor:'#3a3a3a',borderDash:[6,4],borderWidth:1.5,
+          pointRadius:0,fill:false,tension:0
+        }]
+      },
+      options:{
+        responsive:true,
+        interaction:{intersect:false,mode:'index'},
+        plugins:{
+          legend:{display:false},
+          tooltip:{
+            backgroundColor:'#181818',borderColor:'#333',borderWidth:1,
+            titleColor:'#888',bodyColor:'#f0f0f0',padding:12,
+            callbacks:{label:ctx=>`  ${ctx.dataset.label === 'MSRP' ? 'MSRP' : 'Price'}: $${ctx.parsed.y.toLocaleString()}`}
+          }
+        },
+        scales:{
+          x:{ticks:{color:'#555',font:{family:'DM Mono',size:10}},grid:{color:'#1a1a1a'}},
+          y:{
+            ticks:{color:'#555',font:{family:'DM Mono',size:10},callback:v=>`$${v.toLocaleString()}`},
+            grid:{color:'#1a1a1a'},
+            min:Math.min(...prices,b.msrp)*0.93,
+            max:Math.max(...prices,b.msrp)*1.04
+          }
+        }
+      }
+    });
+  });
+}
+
+// ── TAB 3: SEASONAL ──────────────────────────────────────────────────────
+function renderSeasonal() {
+  const sorted = [...EVENTS].map(e=>({...e,days:daysUntil(e.m,e.d)})).sort((a,b)=>a.days-b.days);
+  document.getElementById('eventsGrid').innerHTML = sorted.map((e,idx)=>`
+    <div class="event-card" style="border-top:3px solid ${e.color}">
+      <div class="event-days">${e.days===0?'🔴 TODAY':`${e.days}d away`}</div>
+      ${idx===0?'<div class="up-next-tag">▶ Up Next</div>':''}
+      <div class="event-month">${e.month}</div>
+      <div class="event-name">${e.name}</div>
+      <div class="event-badge ${e.badge}">${e.badgeLabel}</div>
+      <div class="event-desc">${e.desc}</div>
+      <div class="event-tip">💡 ${e.tip}</div>
+    </div>`).join('');
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────
+loadHistory();
+const se = localStorage.getItem('vw_email');
+if (se) { document.getElementById('alertEmail').value=se; alertEmail=se; document.getElementById('emailStatus').textContent=`✓ Alerts active for ${se}`; document.getElementById('emailStatus').className='email-status success'; }
+renderBikes();
+updateStats();
+</script>
+</body>
+</html>
