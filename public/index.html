@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -102,12 +103,8 @@
   .chart-legend{display:flex;flex-wrap:wrap;gap:1rem;margin-bottom:2rem;background:var(--surface);padding:1.25rem;border:1px solid var(--border)}
   .legend-item{display:flex;align-items:center;gap:.5rem;font-family:'DM Mono',monospace;font-size:.72rem;color:var(--text)}
   .legend-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
-  .charts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(480px,1fr));gap:1.5px;background:var(--border)}
-  .chart-wrap{background:var(--surface);padding:1.5rem}
-  .chart-title-row{display:flex;align-items:center;gap:.6rem;margin-bottom:1rem}
-  .chart-title-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-  .chart-title{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:.06em}
-  .chart-msrp{font-family:'DM Mono',monospace;font-size:.68rem;color:var(--muted);margin-left:auto}
+  .charts-grid{display:block}
+  .chart-wrap{background:var(--surface);padding:2rem;border:1px solid var(--border);border-top:2px solid var(--accent)}
   .no-data-msg{font-family:'DM Mono',monospace;font-size:.85rem;color:var(--muted);text-align:center;padding:4rem 2rem;background:var(--surface);border:1px solid var(--border);line-height:2}
 
   /* SEASONAL TAB */
@@ -380,15 +377,18 @@ JSON only. No markdown fences.`,
 
 // ── TAB 2: CHARTS ────────────────────────────────────────────────────────
 function renderCharts() {
+  // Legend
   document.getElementById('chartLegend').innerHTML = BIKES.map((b,i)=>`
     <div class="legend-item"><div class="legend-dot" style="background:${COLORS[i]}"></div>${b.brand} ${b.name}</div>`).join('');
 
+  // Destroy old chart
   Object.values(charts).forEach(c=>c.destroy()); charts={};
+
   const container = document.getElementById('chartsContainer');
   const maxPts = Math.max(...BIKES.map(b=>(priceHistory[b.id]||[]).length));
 
   if (maxPts < 2) {
-    container.innerHTML=`<div class="no-data-msg" style="grid-column:1/-1">
+    container.innerHTML=`<div class="no-data-msg">
       <div style="font-size:2.5rem;margin-bottom:1rem">📊</div>
       <div style="color:var(--text);font-size:.95rem;margin-bottom:.5rem">Run your first scan to start building price history!</div>
       <div>The Jan 1, 2026 MSRP baseline is already seeded. Each scan adds a new data point.</div>
@@ -396,59 +396,81 @@ function renderCharts() {
     return;
   }
 
-  container.innerHTML = BIKES.map((b,i)=>`
-    <div class="chart-wrap">
-      <div class="chart-title-row">
-        <div class="chart-title-dot" style="background:${COLORS[i]}"></div>
-        <div class="chart-title">${b.brand} ${b.name}</div>
-        <div class="chart-msrp">MSRP $${b.msrp.toLocaleString()}</div>
-      </div>
-      <canvas id="chart-${b.id}" height="160"></canvas>
-    </div>`).join('');
+  // Build unified label set (union of all scan timestamps)
+  const allLabels = [];
+  BIKES.forEach(b => {
+    (priceHistory[b.id]||[]).forEach(h => {
+      if (!allLabels.includes(h.label||h.date)) allLabels.push(h.label||h.date);
+    });
+  });
 
-  BIKES.forEach((b,i) => {
+  container.innerHTML = `<div class="chart-wrap" style="grid-column:1/-1"><canvas id="chart-combined" height="420"></canvas></div>`;
+
+  const datasets = BIKES.map((b,i) => {
     const hist = priceHistory[b.id]||[];
-    const labels = hist.map(h=>h.label||h.date);
-    const prices = hist.map(h=>h.price);
-    const color = COLORS[i];
-    const ctx = document.getElementById(`chart-${b.id}`).getContext('2d');
-    charts[b.id] = new Chart(ctx, {
-      type:'line',
-      data:{
-        labels,
-        datasets:[{
-          label:`${b.brand} ${b.name}`,data:prices,
-          borderColor:color,backgroundColor:color+'20',
-          pointBackgroundColor:color,pointBorderColor:'#0a0a0a',pointBorderWidth:2,
-          pointRadius:5,pointHoverRadius:7,borderWidth:2.5,fill:true,tension:0.35
-        },{
-          label:'MSRP',data:Array(prices.length).fill(b.msrp),
-          borderColor:'#3a3a3a',borderDash:[6,4],borderWidth:1.5,
-          pointRadius:0,fill:false,tension:0
-        }]
-      },
-      options:{
-        responsive:true,
-        interaction:{intersect:false,mode:'index'},
-        plugins:{
-          legend:{display:false},
-          tooltip:{
-            backgroundColor:'#181818',borderColor:'#333',borderWidth:1,
-            titleColor:'#888',bodyColor:'#f0f0f0',padding:12,
-            callbacks:{label:ctx=>`  ${ctx.dataset.label === 'MSRP' ? 'MSRP' : 'Price'}: $${ctx.parsed.y.toLocaleString()}`}
-          }
-        },
-        scales:{
-          x:{ticks:{color:'#555',font:{family:'DM Mono',size:10}},grid:{color:'#1a1a1a'}},
-          y:{
-            ticks:{color:'#555',font:{family:'DM Mono',size:10},callback:v=>`$${v.toLocaleString()}`},
-            grid:{color:'#1a1a1a'},
-            min:Math.min(...prices,b.msrp)*0.93,
-            max:Math.max(...prices,b.msrp)*1.04
+    // Map each label to its price (null if no scan at that label)
+    const data = allLabels.map(lbl => {
+      const point = hist.find(h=>(h.label||h.date)===lbl);
+      return point ? point.price : null;
+    });
+    return {
+      label:`${b.brand} ${b.name}`,
+      data,
+      borderColor: COLORS[i],
+      backgroundColor: COLORS[i]+'18',
+      pointBackgroundColor: COLORS[i],
+      pointBorderColor: '#0a0a0a',
+      pointBorderWidth: 2,
+      pointRadius: 5,
+      pointHoverRadius: 8,
+      borderWidth: 2.5,
+      fill: false,
+      tension: 0.35,
+      spanGaps: true
+    };
+  });
+
+  const allPrices = BIKES.flatMap(b=>(priceHistory[b.id]||[]).map(h=>h.price));
+  const yMin = Math.min(...allPrices) * 0.92;
+  const yMax = Math.max(...allPrices) * 1.06;
+
+  const ctx = document.getElementById('chart-combined').getContext('2d');
+  charts['combined'] = new Chart(ctx, {
+    type: 'line',
+    data: { labels: allLabels, datasets },
+    options: {
+      responsive: true,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#181818',
+          borderColor: '#333',
+          borderWidth: 1,
+          titleColor: '#888',
+          bodyColor: '#f0f0f0',
+          padding: 14,
+          callbacks: {
+            label: ctx => {
+              if (ctx.parsed.y === null) return null;
+              return `  ${ctx.dataset.label}: $${ctx.parsed.y.toLocaleString()}`;
+            }
           }
         }
+      },
+      scales: {
+        x: {
+          ticks: { color:'#555', font:{ family:'DM Mono', size:11 }, maxRotation: 45 },
+          grid: { color:'#1a1a1a' }
+        },
+        y: {
+          ticks: { color:'#555', font:{ family:'DM Mono', size:11 }, callback: v=>`$${v.toLocaleString()}` },
+          grid: { color:'#1a1a1a' },
+          min: yMin,
+          max: yMax
+        }
       }
-    });
+    }
   });
 }
 
