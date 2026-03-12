@@ -2,7 +2,7 @@
 // Asks Groq AI to estimate current prices, stores to Vercel KV
 
 import { Redis } from '@upstash/redis';
-const kv = new Redis({ url: process.env.UPSTASH_REDIS_REST_URL, token: process.env.UPSTASH_REDIS_REST_TOKEN });
+const kv = new Redis({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN });
 
 const BIKES = [
   { id: 'revibikes-cougar',    name: 'Revibikes Cougar',          msrp: 1699, url: 'https://www.revibikes.com/products/cougar-electric-motorbikes' },
