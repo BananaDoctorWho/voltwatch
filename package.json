@@ -4,6 +4,7 @@
   "description": "eBike Price Intelligence Tracker",
   "private": true,
   "dependencies": {
-    "nodemailer": "^6.9.9"
+    "nodemailer": "^6.9.9",
+    "@upstash/redis": "^1.34.0"
   }
 }
