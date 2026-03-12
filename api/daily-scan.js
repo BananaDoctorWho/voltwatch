@@ -14,15 +14,6 @@ const BIKES = [
 ];
 
 export default async function handler(req, res) {
-  // Security: only allow Vercel cron or requests with secret
-  const authHeader = req.headers['authorization'];
-  if (
-    req.headers['x-vercel-cron'] !== '1' &&
-    authHeader !== `Bearer ${process.env.CRON_SECRET}`
-  ) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
   const today = new Date().toISOString().slice(0, 10);
   const label = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const results = [];
